@@ -1,0 +1,57 @@
+---
+- hosts: nodes
+  become: yes
+  vars:
+    daemon: httpd
+    filepath: /var/www/html
+    filename: index.html
+  tasks:
+    - name: Install {{ daemon }} service
+      yum:
+        name: "{{ daemon }}"
+        state: latest
+
+    - name: Enable {{ daemon }} service
+      service:
+        name: "{{ daemon }}"
+        enabled: yes
+        state: started
+
+    - name: Check whether {{ daemon }} service is installed
+      command: /usr/bin/systemctl status {{ daemon }}
+      register: my_output
+
+    - name: send message if {{ daemon }} is not startd
+      debug:
+        msg: " {{ daemon }} is not running"
+      when:
+        my_output.rc!=0
+
+    - name: Create path
+      file:
+        path: "{{ filepath }}"
+        recurse: yes
+        state: directory
+    - name: Create file in the dir
+      file:
+        path: "{{ filepath }}/{{ filename }}"
+        state: touch
+
+    - name: Fill the file
+      copy:
+        dest: "{{ filepath }}/{{ filename }}"
+        content: "Welcome to my web server"
+
+    - name: enable httpd ports
+      firewalld:
+        service: http
+        permanent: true
+        state: enabled
+      notify:
+      - Restart firewalld
+
+  handlers:
+    - name: Restart firewalld
+      service:
+        name: firewalld
+        state: restarted
